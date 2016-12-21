@@ -1,0 +1,31 @@
+#!groovy
+
+// Run this node on a Maven Slave
+// Maven Slaves have JDK and Maven already installed
+node('maven') {
+
+   // Get Source Code from SCM (Git) as configured in the Jenkins Project
+   stage 'Checkout SCM'
+   checkout scm
+
+   // Stage: Run Arquillian Tests
+   stage 'Run Arquillian Tests'
+   sh "mvn clean package -Parq-wildfly-managed -s config/nexus-hardcoded-settings.xml"
+   junit 'target/surefire-reports/*.xml'
+
+   stage 'Deploy war file'
+   sh "mvn deploy -Ppostgresql -s config/nexus-hardcoded-settings.xml"
+
+   stage 'Run SonarQube Analysis'
+
+   //sh "mvn sonar:sonar -s config/nexus-hardcoded-settings.xml"
+
+    withSonarQubeEnv('OCP Sonar Server') {
+      // requires SonarQube Scanner for Maven 3.2+
+      sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.2:sonar'
+    }
+
+   // Second Stage: Save the WAR file for later use
+   stage 'Archive war'
+   archive 'target/*.war'
+}
